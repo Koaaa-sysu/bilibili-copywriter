@@ -55,6 +55,35 @@ conda run -n kan_cuda python "${CLAUDE_SKILL_DIR}/scripts/search_bilibili.py" \
 
 **搜索完成后**：向用户展示结果列表（标题、作者、播放量、时长），让用户选择要处理的视频。
 
+### 阶段一B：获取UP主全部视频（可选）
+
+B站空间 API 需要 WBI 签名且反爬严格，推荐用 **浏览器 CDP** 从 DOM 提取：
+
+1. 用 web-access skill 打开 `https://space.bilibili.com/{MID}/video`
+2. 滚动到底部触发懒加载
+3. 用 JS 从 `.upload-video-card` 提取数据：
+
+```javascript
+(() => {
+  const cards = document.querySelectorAll(".upload-video-card");
+  const seen = new Set();
+  const videos = [];
+  cards.forEach(card => {
+    const link = card.querySelector("a.bili-cover-card");
+    if (!link) return;
+    const m = (link.getAttribute("href")||"").match(/(BV[a-zA-Z0-9]+)/);
+    if (!m || seen.has(m[1])) return;
+    seen.add(m[1]);
+    const title = card.querySelector(".bili-video-card__title")?.getAttribute("title") || "";
+    const stats = card.querySelectorAll(".bili-cover-card__stat span");
+    videos.push({bv: m[1], title, play: stats[0]?.textContent?.trim(), duration: stats[2]?.textContent?.trim()});
+  });
+  return JSON.stringify(videos);
+})()
+```
+
+**注意**：B站空间 API（`/x/space/wbi/arc/search`）需要 WBI 签名，未登录状态下频繁请求会被封 IP（-412/-352），不建议用纯 API 方式。
+
 ### 阶段二：下载 + 转写
 
 对用户选定的视频，使用项目中的 `pipeline.py` 执行：
@@ -70,10 +99,10 @@ conda run -n kan_cuda python "${WORK_DIR}/batch_tmp.py"
 ```
 
 **pipeline.py 执行流程**:
-1. 通过 snapany.com API 获取视频直链（绕过B站反爬）
-2. 下载视频到 output 目录
+1. 通过 snapany.com API 获取视频直链（主方案），失败时自动降级到 B站官方 API
+2. 下载视频到 output 目录（带重试机制）
 3. ffmpeg 提取音频为 16kHz WAV
-4. Whisper turbo (CUDA) 转写为文本
+4. Whisper turbo 转写为文本（CUDA 优先，失败自动降级 CPU）
 5. 输出 `.txt` 文件到 output 目录
 
 **预计耗时**:
