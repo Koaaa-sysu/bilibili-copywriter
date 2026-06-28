@@ -1,0 +1,4 @@
+config.env
+test_results.json
+*.pyc
+__pycache__/

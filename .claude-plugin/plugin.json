@@ -1,0 +1,16 @@
+{
+  "name": "bilibili-copywriter",
+  "description": "从B站视频提取文案素材：搜索→下载→转写→提炼Twitter配文",
+  "version": "1.0.0",
+  "author": {
+    "name": "baba"
+  },
+  "license": "MIT",
+  "keywords": [
+    "bilibili",
+    "copywriting",
+    "twitter",
+    "whisper",
+    "transcription"
+  ]
+}
